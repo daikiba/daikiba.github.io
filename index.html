@@ -19,6 +19,9 @@
 .input-number {
   width: 3em;
 }
+.input-key {
+  width: 5em;
+}
 </style>
 <script type="text/javascript">
 // More accurate frame times for all common browsers
@@ -37,7 +40,7 @@ performance.now = (function() {
 // Configurable values for user input
 let FORWARD_KEY = "w"
 //let BLOCK_KEY = "mouse2" // mouse2 == right, mouse0 == left, mouse1 == middle
-let BLOCK_KEY = "s"
+let BLOCK_KEY = ["s", "mouse2"]
 
 // Configurable values for graphics
 let WIDTH=420
@@ -136,59 +139,81 @@ function walkUp() {
   }
 }
 
-function keyDownEvent(evt) {
+function matchesBinding(targetBinding, evt) {
+  let evtKey = null
   if (evt.key != undefined) {
-    let evtKey = evt.key.toLowerCase()
-    if (evtKey == FORWARD_KEY) {
-      walkDown()
-      evt.preventDefault()
-    } else if (evtKey == BLOCK_KEY) {
-      blockDown()
-      evt.preventDefault()
+    evtKey = evt.key.toLowerCase()
+  } else if (evt.button != undefined) {
+    evtKey = "mouse" + evt.button
+  }
+  if (evtKey == null) return false
+  
+  if (typeof targetBinding == "string") {
+    if (targetBinding.indexOf(",") > 0) {
+      let bindingsList = targetBinding.split(",")
+      for (let bindKey in bindingsList) {
+        if (evtKey == bindingsList[bindKey].toLowerCase()) {
+          return true
+        }
+      }
+    } else if (evtKey == targetBinding.toLowerCase()) {
+      return true
     }
+  } else if (typeof targetBinding == "object") {
+    for (let bindKey in targetBinding) {
+      if (evtKey == targetBinding[bindKey]) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function keyDownEvent(evt) {
+  if (matchesBinding(FORWARD_KEY, evt)) {
+    walkDown()
+    evt.preventDefault()
+  }
+  if (matchesBinding(BLOCK_KEY, evt)) {
+    blockDown()
+    evt.preventDefault()
   }
 }
 
 function keyUpEvent(evt) {
-  if (evt.key != undefined) {
-    let evtKey = evt.key.toLowerCase()
-    if (evtKey == FORWARD_KEY) {
-      walkUp()
-      evt.preventDefault()
-    } else if (evtKey == BLOCK_KEY) {
-      blockUp()
-      evt.preventDefault()
-    }
+  if (matchesBinding(FORWARD_KEY, evt)) {
+    walkUp()
+    evt.preventDefault()
+  }
+  if (matchesBinding(BLOCK_KEY, evt)) {
+    blockUp()
+    evt.preventDefault()
   }
 }
 
 function mouseDownEvent(evt) {
-  if (evt.button != undefined) {
-    let evtMouse = "mouse" + evt.button
-    if (evtMouse == BLOCK_KEY) {
-      blockDown()
-      evt.preventDefault()
-      evt.stopPropagation()
-    } else if (evtMouse == FORWARD_KEY) {
-      walkDown()
-      evt.preventDefault()
-      evt.stopPropagation()
-    }
+  if (matchesBinding(BLOCK_KEY, evt)) {
+    blockDown()
+    evt.preventDefault()
+    evt.stopPropagation()
+  }
+  if (matchesBinding(FORWARD_KEY, evt)) {
+    walkDown()
+    evt.preventDefault()
+    evt.stopPropagation()
   }
 }
 
 function mouseUpEvent(evt) {
-  if (evt.button != undefined) {
-    let evtMouse = "mouse" + evt.button
-    if (evtMouse == BLOCK_KEY) {
-      blockUp()
-      evt.preventDefault()
-      evt.stopPropagation()
-    } else if (evtMouse == FORWARD_KEY) {
-      walkUp()
-      evt.preventDefault()
-      evt.stopPropagation()
-    }
+  if (matchesBinding(BLOCK_KEY, evt)) {
+    blockUp()
+    evt.preventDefault()
+    evt.stopPropagation()
+  }
+  if (matchesBinding(FORWARD_KEY, evt)) {
+    walkUp()
+    evt.preventDefault()
+    evt.stopPropagation()
   }
 }
 
@@ -229,6 +254,14 @@ function updateAnimationFps() {
   FPS = input_animation_fps.value - 0
   resetConfig()
 }
+function updateBlockKey() {
+  BLOCK_KEY = input_key_block.value
+  resetConfig()
+}
+function updateWalkKey() {
+  FORWARD_KEY = input_key_walk.value
+  resetConfig()
+}
 
 function initSettings() {
   input_block_frames_min.value = BLOCK_FRAME_LOWER
@@ -236,17 +269,19 @@ function initSettings() {
   input_walk_frames_min.value = WALK_FRAME_LOWER
   input_walk_frames_max.value = WALK_FRAME_UPPER
   input_animation_fps.value = FPS
+  input_key_block.value = BLOCK_KEY
+  input_key_walk.value = FORWARD_KEY
   
   input_block_frames_min.oninput = updateBlockMin
   input_block_frames_max.oninput = updateBlockMax
   input_walk_frames_min.oninput = updateWalkMin
   input_walk_frames_max.oninput = updateWalkMax
   input_animation_fps.oninput = updateAnimationFps
+  input_key_block.oninput = updateBlockKey
+  input_key_walk.oninput = updateWalkKey
 }
 
 function init() {
-  FORWARD_KEY = FORWARD_KEY.toLowerCase()
-  BLOCK_KEY = BLOCK_KEY.toLowerCase()
   zipgraph.width = WIDTH
   zipgraph.height = HEIGHT
   ctx = zipgraph.getContext("2d")
@@ -368,6 +403,11 @@ max: <input type="text" class="input-number" id="input_walk_frames_max" value="0
 </p>
 <p>
 FPS: <input type="text" class="input-number" id="input_animation_fps" value="0"></input> 
+</p>
+<p>
+<b>Keybinds</b> 
+block: <input type="text" class="input-key" id="input_key_block" value="mouse2"></input> 
+walk: <input type="text" class="input-key" id="input_key_walk" value="w"></input>
 </p>
 </div>
 </body>
