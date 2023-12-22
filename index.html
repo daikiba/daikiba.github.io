@@ -3,22 +3,25 @@
 <title>Sword and Shield Game Zip Practice Tool</title>
 <style>
 #gamearea {
-	background: #333;
+  background: #333;
   width: 80%;
   height: 45%;
-	border: solid 2px black;
+  border: solid 2px black;
 }
 #gamearea p {
   color: #bbb;
 }
 #zipgraph {
-	width: 420px;
-	height: 69px;
+  width: 420px;
+  height: 69px;
   border: solid 1px red;
+}
+.input-number {
+  width: 3em;
 }
 </style>
 <script type="text/javascript">
-// More accurate frame times
+// More accurate frame times for all common browsers
 performance = window.performance || {}
 performance.now = (function() {
   return performance.now       ||
@@ -31,42 +34,66 @@ performance.now = (function() {
   };
 })();
 
+// Configurable values for user input
+let FORWARD_KEY = "w"
+//let BLOCK_KEY = "mouse2" // mouse2 == right, mouse0 == left, mouse1 == middle
+let BLOCK_KEY = "s"
+
+// Configurable values for graphics
+let WIDTH=420
+let HEIGHT=69
+let BAR_MARGIN = 20
+let BAR_HEIGHT = 12
+let FONT_SIZE = 16
+let COLOR_BG = "#eee"
+let COLOR_LINE = "#111"
+let COLOR_BLOCKBAR = "#99f"
+let COLOR_OKBAR = "#9f9"
+let COLOR_NOKBAR = "#f99"
+let COLOR_TARGETLINE_BLOCK = "#393"
+let COLOR_TARGETLINE_WALK = "#9f9"
+
 let FPS = 60.0
-let FRAME_MS = 1000.0 / FPS
 let BLOCK_FRAME_LOWER = 125 // Must hit animation AFTER frame 125 but before frame 127
 let BLOCK_FRAME_UPPER = 127
 let WALK_FRAME_LOWER = 6 // Must hold walk for over 6 frames but less than 8 frames
 let WALK_FRAME_UPPER = 8
-let FORWARD_KEY = "w"
-let BLOCK_KEY = "mouse2" // mouse2 == right, mouse0 == left, mouse1 == middle
 
+// Global configuration values, these will get recalculated if settings are changed
+let FRAME_MS = 1000.0 / FPS
 let BLOCK_FRAME_LOWER_MS = BLOCK_FRAME_LOWER * FRAME_MS
 let BLOCK_FRAME_UPPER_MS = BLOCK_FRAME_UPPER * FRAME_MS
 let WALK_FRAME_LOWER_MS = WALK_FRAME_LOWER * FRAME_MS
 let WALK_FRAME_UPPER_MS = WALK_FRAME_UPPER * FRAME_MS
 let MIN_TOTAL_MS = BLOCK_FRAME_LOWER_MS + WALK_FRAME_LOWER_MS
 let MAX_TOTAL_MS = BLOCK_FRAME_UPPER_MS + WALK_FRAME_UPPER_MS
-let WIDTH=420
-let HEIGHT=69
-let BAR_MARGIN = 20
-let BAR_HEIGHT = 12
-let ZIP_BAR_LENGTH = (WIDTH - (BAR_MARGIN * 2))
+let ZIP_BAR_LENGTH = WIDTH - (BAR_MARGIN * 2)
 let ZIP_BAR_STEP = ZIP_BAR_LENGTH / MAX_TOTAL_MS
-let FONT_SIZE = 16
+
+// State related variables
 let lastFrame = performance.now()
 let ctx=null
 let blockHeld = false
 let blockDownStart = 0
 let blockDownEnd = 1
+let blockTotalHeld = 0
 let walkHeld = false
 let walkDownStart = 0
 let walkDownEnd = 1
 let walkOffsetMs = 0
+let walkTotalHeld = 0
 
 function blockDown() {
   if (!blockHeld) {
+    if (!walkHeld) {
+      walkDownEnd = 1
+      walkDownStart = 0
+      walkOffsetMs = 0
+    }
     blockHeld = true
     blockDownStart = performance.now()
+    blockDownEnd = 1
+    blockTotalHeld = 0
   }
 }
 
@@ -74,17 +101,20 @@ function blockUp() {
   if (blockHeld) {
     blockHeld = false
     blockDownEnd = performance.now()
-    let blockMs = blockDownEnd - blockDownStart;
-    console.log("Block held for " + parseFloat(blockMs).toFixed(2) + " ms (" + parseFloat(blockMs / FRAME_MS).toFixed(2) + " frames)")
+    blockTotalHeld = blockDownEnd - blockDownStart;
+    console.log("Block held for " + parseFloat(blockTotalHeld).toFixed(2) + " ms (" + parseFloat(blockTotalHeld / FRAME_MS).toFixed(2) + " frames)")
   }
 }
 
 function walkDown() {
   if (!walkHeld) {
     walkHeld = true
+    walkDownEnd = 1
     walkDownStart = performance.now()
+    walkTotalHeld = 0
     if (blockHeld) {
       walkOffsetMs = walkDownStart - blockDownStart
+      blockUp() // Block hold state no longer matters after walking, so releasing  block
     } else {
       walkOffsetMs = 0
     }
@@ -95,8 +125,8 @@ function walkUp() {
   if (walkHeld) {
     walkHeld = false
     walkDownEnd = performance.now()
-    let walkMs = walkDownEnd - walkDownStart;
-    console.log("Walk held for " + parseFloat(walkMs).toFixed(2) + " ms (" + parseFloat(walkMs / FRAME_MS).toFixed(2) + " frames)")
+    walkTotalHeld = walkDownEnd - walkDownStart;
+    console.log("Walk held for " + parseFloat(walkTotalHeld).toFixed(2) + " ms (" + parseFloat(walkTotalHeld / FRAME_MS).toFixed(2) + " frames)")
   }
 }
 
@@ -161,15 +191,65 @@ function ignoreMouseMenu(evt) {
   evt.stopPropagation()
 }
 
+function resetConfig() {
+  FRAME_MS = 1000.0 / FPS
+  BLOCK_FRAME_LOWER_MS = BLOCK_FRAME_LOWER * FRAME_MS
+  BLOCK_FRAME_UPPER_MS = BLOCK_FRAME_UPPER * FRAME_MS
+  WALK_FRAME_LOWER_MS = WALK_FRAME_LOWER * FRAME_MS
+  WALK_FRAME_UPPER_MS = WALK_FRAME_UPPER * FRAME_MS
+  MIN_TOTAL_MS = BLOCK_FRAME_LOWER_MS + WALK_FRAME_LOWER_MS
+  MAX_TOTAL_MS = BLOCK_FRAME_UPPER_MS + WALK_FRAME_UPPER_MS
+  ZIP_BAR_LENGTH = WIDTH - (BAR_MARGIN * 2)
+  ZIP_BAR_STEP = ZIP_BAR_LENGTH / MAX_TOTAL_MS
+}
+
+function updateBlockMin() {
+  BLOCK_FRAME_LOWER = input_block_frames_min.value - 0
+  resetConfig()
+}
+function updateBlockMax() {
+  BLOCK_FRAME_UPPER = input_block_frames_max.value - 0
+  resetConfig()
+}
+function updateWalkMin() {
+  WALK_FRAME_LOWER = input_walk_frames_min.value - 0
+  resetConfig()
+}
+function updateWalkMax() {
+  WALK_FRAME_UPPER = input_walk_frames_max.value - 0
+  resetConfig()
+}
+function updateAnimationFps() {
+  FPS = input_animation_fps.value - 0
+  resetConfig()
+}
+
+function initSettings() {
+  input_block_frames_min.value = BLOCK_FRAME_LOWER
+  input_block_frames_max.value = BLOCK_FRAME_UPPER
+  input_walk_frames_min.value = WALK_FRAME_LOWER
+  input_walk_frames_max.value = WALK_FRAME_UPPER
+  input_animation_fps.value = FPS
+  
+  input_block_frames_min.oninput = updateBlockMin
+  input_block_frames_max.oninput = updateBlockMax
+  input_walk_frames_min.oninput = updateWalkMin
+  input_walk_frames_max.oninput = updateWalkMax
+  input_animation_fps.oninput = updateAnimationFps
+}
+
 function init() {
   FORWARD_KEY = FORWARD_KEY.toLowerCase()
   BLOCK_KEY = BLOCK_KEY.toLowerCase()
   zipgraph.width = WIDTH
   zipgraph.height = HEIGHT
   ctx = zipgraph.getContext("2d")
-  ctx.fillStyle = "#eee"
-  ctx.strokeStyle = "#111"
+  ctx.fillStyle = COLOR_BG
+  ctx.strokeStyle = COLOR_LINE
   ctx.font = FONT_SIZE + "px Courier New"
+  
+  resetConfig()
+  initSettings()
   
   onkeydown = keyDownEvent
   onkeyup = keyUpEvent
@@ -197,14 +277,16 @@ function drawZipBar(timeNow) {
   ctx.save()
   ctx.translate(BAR_MARGIN, FONT_SIZE * 1.5)
   
+  let currentTime = 0
   // Block bar logic
   let blockTime = blockDownEnd - blockDownStart
   if (blockHeld) {
     blockTime = timeNow - blockDownStart
   }
+  currentTime = blockTime
   let blockLength = Math.min(blockTime * ZIP_BAR_STEP, WIDTH - BAR_MARGIN)
   // Draw block down color
-  ctx.fillStyle = "#99f"
+  ctx.fillStyle = COLOR_BLOCKBAR
   ctx.fillRect(0, 0, blockLength, BAR_HEIGHT)
   ctx.strokeRect(0, 0, blockLength, BAR_HEIGHT)
   
@@ -215,23 +297,51 @@ function drawZipBar(timeNow) {
     walkTime = timeNow - walkDownStart
   }
   let walkLength = walkTime * ZIP_BAR_STEP
+  if (walkDownStart > 0) {
+    currentTime = walkTime + walkOffsetMs
+  }
   // Draw walk down color
-  if (walkOffsetMs > MIN_TOTAL_MS && walkTime < MAX_TOTAL_MS - walkOffsetMs) {
+  if (walkTime > MIN_TOTAL_MS && walkTime < MAX_TOTAL_MS - walkOffsetMs) {
     // Green if good
-    ctx.fillStyle = "#9f9"
+    ctx.fillStyle = COLOR_OKBAR
   } else {
     // Red if bad
-    ctx.fillStyle = "#f99"
+    ctx.fillStyle = COLOR_NOKBAR
   }
   ctx.fillRect(walkOffset, BAR_HEIGHT, walkLength, BAR_HEIGHT)
   ctx.strokeRect(walkOffset, BAR_HEIGHT, walkLength, BAR_HEIGHT)
-  // Draw target line
+
+  // Draw target lines
+  ctx.save()
+  ctx.strokeStyle = COLOR_TARGETLINE_BLOCK
+  ctx.beginPath()
+  ctx.moveTo(BLOCK_FRAME_LOWER_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
+  ctx.lineTo(BLOCK_FRAME_LOWER_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
+  ctx.stroke()
+  ctx.moveTo(BLOCK_FRAME_UPPER_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
+  ctx.lineTo(BLOCK_FRAME_UPPER_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
+  ctx.stroke()
+  
+  ctx.strokeStyle = COLOR_TARGETLINE_WALK
+  ctx.beginPath()
   ctx.moveTo(MIN_TOTAL_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(MIN_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 2.25)
+  ctx.lineTo(MIN_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
   ctx.stroke()
   ctx.moveTo(MAX_TOTAL_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(MAX_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 2.25)
+  ctx.lineTo(MAX_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
   ctx.stroke()
+  ctx.restore()
+
+  // Draw frame line
+  let lineX = currentTime * ZIP_BAR_STEP
+  let lineY = 3.0*BAR_HEIGHT
+  let textOffset = lineX > WIDTH / 2 ? 6.0 * FONT_SIZE  : 0;
+  ctx.beginPath()
+  ctx.moveTo(lineX, 0)
+  ctx.lineTo(lineX, lineY)
+  ctx.stroke()
+  ctx.strokeText("frame " + (0|(currentTime / FRAME_MS)), lineX - textOffset, lineY)
+
   ctx.restore()
 }
 
@@ -241,5 +351,21 @@ function drawZipBar(timeNow) {
 <canvas id="zipgraph">Failing to display. No canvas support :(</canvas>
 </div>
 <div id="gamearea"><p>This is the game window, do your input here!</p></div>
+<div id="settings">
+<p><b>Settings</b></p>
+<p>
+Block frames
+min: <input type="text" class="input-number" id="input_block_frames_min" value="0"></input> 
+max: <input type="text" class="input-number" id="input_block_frames_max" value="0"></input>
+</p>
+<p>
+Walk frames
+min: <input type="text" class="input-number" id="input_walk_frames_min" value="0"></input> 
+max: <input type="text" class="input-number" id="input_walk_frames_max" value="0"></input>
+</p>
+<p>
+FPS: <input type="text" class="input-number" id="input_animation_fps" value="0"></input> 
+</p>
+</div>
 </body>
 </html>
