@@ -50,8 +50,8 @@ let COLOR_LINE = "#111"
 let COLOR_BLOCKBAR = "#99f"
 let COLOR_OKBAR = "#9f9"
 let COLOR_NOKBAR = "#f99"
-let COLOR_TARGETLINE_BLOCK = "#393"
-let COLOR_TARGETLINE_WALK = "#9f9"
+let COLOR_TARGETLINE_BLOCK = "#33993377"
+let COLOR_TARGETLINE_WALK = "#66ee6677"
 
 let FPS = 60.0
 let BLOCK_FRAME_LOWER = 125 // Must hit animation AFTER frame 125 but before frame 127
@@ -77,11 +77,13 @@ let blockHeld = false
 let blockDownStart = 0
 let blockDownEnd = 1
 let blockTotalHeld = 0
+let blockOk = false
 let walkHeld = false
 let walkDownStart = 0
 let walkDownEnd = 1
 let walkOffsetMs = 0
 let walkTotalHeld = 0
+let walkOk = false
 
 function blockDown() {
   if (!blockHeld) {
@@ -94,6 +96,7 @@ function blockDown() {
     blockDownStart = performance.now()
     blockDownEnd = 1
     blockTotalHeld = 0
+    gameareaDebug.innerHTML = ""
   }
 }
 
@@ -102,7 +105,7 @@ function blockUp() {
     blockHeld = false
     blockDownEnd = performance.now()
     blockTotalHeld = blockDownEnd - blockDownStart;
-    console.log("Block held for " + parseFloat(blockTotalHeld).toFixed(2) + " ms (" + parseFloat(blockTotalHeld / FRAME_MS).toFixed(2) + " frames)")
+    //console.log("Block held for " + parseFloat(blockTotalHeld).toFixed(2) + " ms (" + parseFloat(blockTotalHeld / FRAME_MS).toFixed(2) + " frames)")
   }
 }
 
@@ -126,7 +129,10 @@ function walkUp() {
     walkHeld = false
     walkDownEnd = performance.now()
     walkTotalHeld = walkDownEnd - walkDownStart;
-    console.log("Walk held for " + parseFloat(walkTotalHeld).toFixed(2) + " ms (" + parseFloat(walkTotalHeld / FRAME_MS).toFixed(2) + " frames)")
+    //console.log("Walk held for " + parseFloat(walkTotalHeld).toFixed(2) + " ms (" + parseFloat(walkTotalHeld / FRAME_MS).toFixed(2) + " frames)")
+    
+    let debugText = "Block: " + (blockOk ? "OK" : "FAIL") + "<br />Walk: " + (walkOk ? "OK" : "FAIL")
+    gameareaDebug.innerHTML = debugText
   }
 }
 
@@ -283,6 +289,9 @@ function drawZipBar(timeNow) {
   if (blockHeld) {
     blockTime = timeNow - blockDownStart
   }
+  
+  blockOk = blockTime >= BLOCK_FRAME_LOWER_MS && blockTime <= BLOCK_FRAME_UPPER_MS
+  
   currentTime = blockTime
   let blockLength = Math.min(blockTime * ZIP_BAR_STEP, WIDTH - BAR_MARGIN)
   // Draw block down color
@@ -300,8 +309,11 @@ function drawZipBar(timeNow) {
   if (walkDownStart > 0) {
     currentTime = walkTime + walkOffsetMs
   }
+  
+  walkOk = walkTime >= WALK_FRAME_LOWER_MS && walkTime <= WALK_FRAME_UPPER_MS
+  
   // Draw walk down color
-  if (walkTime > MIN_TOTAL_MS && walkTime < MAX_TOTAL_MS - walkOffsetMs) {
+  if (walkOk && blockOk) {
     // Green if good
     ctx.fillStyle = COLOR_OKBAR
   } else {
@@ -311,25 +323,13 @@ function drawZipBar(timeNow) {
   ctx.fillRect(walkOffset, BAR_HEIGHT, walkLength, BAR_HEIGHT)
   ctx.strokeRect(walkOffset, BAR_HEIGHT, walkLength, BAR_HEIGHT)
 
-  // Draw target lines
+  // Draw target areas
   ctx.save()
-  ctx.strokeStyle = COLOR_TARGETLINE_BLOCK
-  ctx.beginPath()
-  ctx.moveTo(BLOCK_FRAME_LOWER_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(BLOCK_FRAME_LOWER_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
-  ctx.stroke()
-  ctx.moveTo(BLOCK_FRAME_UPPER_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(BLOCK_FRAME_UPPER_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
-  ctx.stroke()
+  ctx.fillStyle = COLOR_TARGETLINE_BLOCK
+  ctx.fillRect(BLOCK_FRAME_LOWER_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25, (BLOCK_FRAME_UPPER_MS-BLOCK_FRAME_LOWER_MS)*ZIP_BAR_STEP, FONT_SIZE * 2.5)
   
-  ctx.strokeStyle = COLOR_TARGETLINE_WALK
-  ctx.beginPath()
-  ctx.moveTo(MIN_TOTAL_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(MIN_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
-  ctx.stroke()
-  ctx.moveTo(MAX_TOTAL_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25)
-  ctx.lineTo(MAX_TOTAL_MS*ZIP_BAR_STEP, FONT_SIZE * 1.25)
-  ctx.stroke()
+  ctx.fillStyle = COLOR_TARGETLINE_WALK
+  ctx.fillRect(MIN_TOTAL_MS*ZIP_BAR_STEP, -FONT_SIZE * 0.25, (MAX_TOTAL_MS-MIN_TOTAL_MS)*ZIP_BAR_STEP, FONT_SIZE * 2.5)
   ctx.restore()
 
   // Draw frame line
@@ -350,7 +350,10 @@ function drawZipBar(timeNow) {
 <div id="zipgrapharea">
 <canvas id="zipgraph">Failing to display. No canvas support :(</canvas>
 </div>
-<div id="gamearea"><p>This is the game window, do your input here!</p></div>
+<div id="gamearea">
+<p>This is the game window, do your input here!</p>
+<p id="gameareaDebug"></p>
+</div>
 <div id="settings">
 <p><b>Settings</b></p>
 <p>
