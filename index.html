@@ -134,7 +134,7 @@ function walkUp() {
     walkTotalHeld = walkDownEnd - walkDownStart;
     //console.log("Walk held for " + parseFloat(walkTotalHeld).toFixed(2) + " ms (" + parseFloat(walkTotalHeld / FRAME_MS).toFixed(2) + " frames)")
     
-    let debugText = "Block: " + (blockOk ? "OK" : "FAIL") + "<br />Walk: " + (walkOk ? "OK" : "FAIL")
+    let debugText = "Block: " + (blockOk ? "OK - " : "FAIL - ") + (0|(blockTotalHeld/FRAME_MS)) + " frames" + "<br />Walk: " + (walkOk ? "OK - " : "FAIL - ") + (0|(walkTotalHeld/FRAME_MS)) + " frames"
     gameareaDebug.innerHTML = debugText
   }
 }
