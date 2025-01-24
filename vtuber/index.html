@@ -1,0 +1,265 @@
+<html>
+<head>
+<title>Googly-eyed Blabbermouth [GoBla]</title>
+<style type="text/css">
+body {
+  background: #2f2;
+}
+.stickContainer {
+	border: 2px solid black;
+  border-radius: 50%;
+  display: inline-block;
+	width: 3em;
+	height: 3em;
+  background-color: #f4f4f4;
+  position: absolute;
+}
+
+.stick {
+  position: absolute;
+  background-color: #999;
+  border-radius: 50%;
+  display: inline-block;
+	width: 1.15em;
+	height: 1.15em;
+  border: 0.45em solid #55c;
+}
+
+#sL {
+  z-index: 1;
+  position: relative;
+  left: 4em;
+  top: 0;
+}
+
+#sR {
+  z-index: 1;
+  position: relative;
+  left: 8em;
+  top: 0;
+}
+
+#aL {
+  z-index: 1;
+  position: relative;
+  left: 0.50em;
+  top: 0.50em;
+}
+
+#aR {
+  z-index: 1;
+  position: relative;
+  left: 0.50em;
+  top: 0.50em;
+}
+
+#padoptions {
+  display: none;
+  overflow: hidden;
+  padding-top: 2em;
+}
+
+#mouth {
+  z-index: 8;
+  position: absolute;
+  display: none;
+  top: 320px;
+  left: 220px;
+  overflow: hidden;
+}
+
+.active {
+  background-color: #eee;
+}
+
+.inactive {
+  background-color: #333;
+}
+
+#eyes {
+  z-index: 2;
+  position: absolute;
+  top: 290px;
+  left: 130px;
+  display: inline-block;
+}
+
+#face img {
+  z-index: -3;
+}
+
+#face {
+  z-index: -3;
+  display: block;
+}
+</style>
+<script language="javascript">
+
+let WIDTH = 300;
+let HEIGHT = 80;
+let selectedGamepadId = 0;
+let bufferLength, dataArray, analyser, canvasCtx, activeGamePad;
+let stickMovementMax = 1.8;
+let mouthframes = 3;
+let mouthFrameWidth = 0;
+let mouthState = 0;
+let lastMouthState = -1;
+let voiceLevel = 100;
+let mouthThresholds = [0, 2, 7];
+let mouthActivityMax = 9;
+let mouthActivity = 0;
+let degradeGain = 0;
+
+function init() {
+  let stream;
+  let audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  bufferLength = analyser.frequencyBinCount;
+  dataArray = new Uint8Array(bufferLength);
+
+  analyser.getByteTimeDomainData(dataArray);
+
+
+  navigator.mediaDevices
+  .getUserMedia({"audio": true})
+  .then((stream) => {
+    let source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    draw();
+  })
+  .catch(function (err) {
+    console.error("The following gUM error occured: " + err);
+  });
+  
+  canvasCtx = c.getContext("2d");
+  mouthFrameWidth = ~~(mouth.firstChild.width / mouthframes);
+  mouth.style.width = mouthFrameWidth + "px";
+  mouth.style.display = "inline-block";
+}
+
+function activateGamepad() {
+  let gamepads = navigator.getGamepads();
+  if (gamepads != null && gamepads.length > 1) {
+    while (padselector.firstElementChild != null) {
+      padselector.firstElementChild.remove();
+    }
+    for (let i in gamepads) {
+      let padId = document.createTextNode(gamepads[i].id);
+      let padOption = document.createElement("option");
+      padOption.value = i;
+      padOption.appendChild(padId);
+      padselector.appendChild(padOption);
+    }
+    padoptions.style.display = "block";
+  } else {
+    padoptions.style.display = "none";
+    selectedGamepadId = 0;
+  }
+	activeGamePad = gamepads[selectedGamepadId];
+}
+
+function selectActiveGamepad(e) {
+  selectedGamepadId = padselector.selectedIndex;
+}
+
+function updateAnalogue(gamepad, id, element) {
+  // Rounding in place in order to smooth some accuracy (multiply by 20, round, multiply by 1/20)
+  element.style.left = ~~(((gamepad.axes[id] + 0.6) / 2.0) * 15) / 15 * stickMovementMax + "em";
+  element.style.top = ~~(((gamepad.axes[id + 1] + 0.6) / 2.0) * 15) / 15 * stickMovementMax + "em";
+}
+
+function updateButtonStyles() {
+  if (activeGamePad == null){
+    activateGamepad();
+    if (activeGamePad == null) return;
+  }
+  updateAnalogue(activeGamePad, 0, aL);
+  updateAnalogue(activeGamePad, 2, aR);
+}
+
+function degradeBlabber() {
+  mouthActivity = Math.max(mouthActivity - 1 - degradeGain, 0);
+  degradeGain = 0;
+}
+
+function addBlabber() {
+  if (mouthActivity >= mouthActivityMax) {
+    if (degradeGain++ > mouthActivityMax*4) degradeBlabber();
+  }
+  mouthActivity = Math.min(mouthActivity + 1, mouthActivityMax);
+}
+
+function checkBlabber() {
+  let nextState = 0;
+  console.log(mouthActivity);
+  for (let i in mouthThresholds) {
+    if (mouthActivity > mouthThresholds[i]) {
+      nextState = i;
+    } else {
+      break;
+    }
+  }
+  mouthState = nextState;
+  return nextState;
+}
+
+
+function draw() {
+  updateButtonStyles();
+  if (mouthState != lastMouthState) {
+    mouth.firstChild.style.transform="translateX(-" + (mouthState%mouthframes) * mouthFrameWidth + "px)";
+    lastMouthState = mouthState;
+  }
+  analyser.getByteFrequencyData(dataArray);
+
+  canvasCtx.fillStyle = "rgb(0 0 0)";
+  canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+  const barWidth = (WIDTH / bufferLength) * 2.5;
+  let barHeight;
+  let x = 0;
+  
+  if (dataArray[30] > voiceLevel) {
+    addBlabber();
+  } else {
+    degradeBlabber();
+  }
+  checkBlabber();
+  
+  for (let i = 0; i < bufferLength; i++) {
+    barHeight = dataArray[i] / 2;
+
+    canvasCtx.fillStyle = `rgb(${barHeight + 150} 50 50)`;
+    canvasCtx.fillRect(x, HEIGHT - barHeight / 2, barWidth, 0.5*barHeight);
+
+    x += barWidth + 1;
+  }
+  requestAnimationFrame(draw);
+}
+</script>
+</head>
+<body>
+<h1>Testing</h1>
+<div id="face">
+<img src="skyrimhelmi.png" />
+</div>
+<div id="eyes">
+  <div id="sL" class="stickContainer">
+    <div id="aL" class="stick inactive"></div>
+  </div>
+  <div id="sR" class="stickContainer">
+    <div id="aR" class="stick inactive"></div>
+  </div>
+</div>
+<div id="mouth"><img src="mouths.png" /></div>
+<p>
+Debug
+<input type="button" onclick="init()" value="Start"></input>
+</p>
+<canvas id="c">Not supported</canvas>
+<div id ="padoptions">
+  <select id="padselector">
+  </select>
+</div>
+</body>
+</html>
